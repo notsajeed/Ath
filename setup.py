@@ -14,6 +14,6 @@ setup(
         ],
     },
     python_requires=">=3.8",
-    author="Your Name",
+    author="sajeed",
     description="Your personal, per-folder AI assistant",
 )

@@ -1,4 +1,4 @@
-# ath/cli.py - Fixed version with all commands
+
 import typer
 import shutil
 from pathlib import Path
@@ -6,6 +6,8 @@ from rich.console import Console
 from rich.progress import Progress
 from .scanner import ProjectScanner
 from .storage import LocalStorage
+from .utils import find_project_root, find_aibuddy_dir
+from .ai_chat import start_interactive_chat
 
 app = typer.Typer(help="Ath - Your personal, per-folder AI assistant")
 console = Console()
@@ -13,15 +15,22 @@ console = Console()
 @app.command()
 def init(force: bool = typer.Option(False, "--force", "-f", help="Force re-initialization")):
     """Initialize AI agent for current project"""
-    current_dir = Path.cwd()
-    aibuddy_dir = current_dir / ".aibuddy"
+    
+    # Find the right project root instead of using current directory
+    project_root = find_project_root()
+    aibuddy_dir = project_root / ".aibuddy"
+    
+    # Show where we're initializing
+    if project_root != Path.cwd():
+        console.print(f"[blue]Found project root at: {project_root}[/blue]")
     
     # Check if already initialized
     if aibuddy_dir.exists() and not force:
         console.print("[yellow]Project already initialized! Use --force to re-initialize.[/yellow]")
+        console.print(f"[dim]Location: {aibuddy_dir}[/dim]")
         return
     
-    console.print(f"[green]Initializing Ath agent in {current_dir.name}[/green]")
+    console.print(f"[green]Initializing Ath agent in {project_root.name}[/green]")
     
     # Create .aibuddy directory (remove if force)
     if force and aibuddy_dir.exists():
@@ -36,8 +45,8 @@ def init(force: bool = typer.Option(False, "--force", "-f", help="Force re-initi
     storage.init_db()
     console.print("✓ Initialized database")
     
-    # Scan project
-    scanner = ProjectScanner(current_dir)
+    # Scan project from the project root
+    scanner = ProjectScanner(project_root)
     
     with Progress() as progress:
         task = progress.add_task("Scanning project files...", total=None)
@@ -50,14 +59,20 @@ def init(force: bool = typer.Option(False, "--force", "-f", help="Force re-initi
     
     console.print("[bold green]Project initialized successfully![/bold green]")
 
+# You'll also need to update other commands to use the same logic:
+
 @app.command()
 def status():
     """Show project status and statistics"""
-    aibuddy_dir = Path.cwd() / ".aibuddy"
+    aibuddy_dir = find_aibuddy_dir()
     
-    if not aibuddy_dir.exists():
+    if not aibuddy_dir:
         console.print("[red]No AI agent found. Run 'ath init' first.[/red]")
         return
+    
+    # Show where we found it if not in current directory
+    if aibuddy_dir.parent != Path.cwd():
+        console.print(f"[dim]Using project at: {aibuddy_dir.parent}[/dim]")
     
     from .utils import get_project_stats
     
@@ -80,49 +95,50 @@ def status():
         console.print("[yellow]Try running 'ath init --force' to reinitialize.[/yellow]")
 
 @app.command()
-def chat():
+def chat(
+    provider: str = typer.Option(None, "--provider", "-p", help="AI provider: openai, anthropic, ollama")
+):
     """Start interactive chat with project AI"""
-    aibuddy_dir = Path.cwd() / ".aibuddy"
+    aibuddy_dir = find_aibuddy_dir()
     
-    if not aibuddy_dir.exists():
+    if not aibuddy_dir:
         console.print("[red]No AI agent found. Run 'ath init' first.[/red]")
         return
     
-    console.print("[blue]Chat mode activated. Type 'exit' to quit.[/blue]")
+    # Show where we found it if not in current directory
+    if aibuddy_dir.parent != Path.cwd():
+        console.print(f"[dim]Using project at: {aibuddy_dir.parent}[/dim]")
     
     storage = LocalStorage(aibuddy_dir)
     
     # Test database connection first
     try:
         code_chunks = storage.get_all_chunks()
+        if not code_chunks:
+            console.print("[yellow]No code chunks found. Run 'ath init' to scan your project.[/yellow]")
+            return
     except Exception as e:
         console.print(f"[red]Database error: {e}[/red]")
         console.print("[yellow]Try running 'ath init --force' to fix the database.[/yellow]")
         return
     
-    while True:
-        try:
-            question = typer.prompt("You")
-            if question.lower() in ['exit', 'quit', 'q']:
-                break
-            
-            # For now, just echo back with stored code context
-            response = f"I found {len(code_chunks)} code chunks in your project. You asked: '{question}'"
-            console.print(f"[green]Ath:[/green] {response}")
-            
-        except KeyboardInterrupt:
-            break
-    
-    console.print("[blue]Chat ended.[/blue]")
+    # Import and start chat
+    from .ai_chat import start_interactive_chat
+    start_interactive_chat(storage, provider)
+
 
 @app.command()
 def inspect(file_path: str = typer.Argument(help="File to inspect")):
     """Show what code chunks were extracted from a file"""
-    aibuddy_dir = Path.cwd() / ".aibuddy"
+    aibuddy_dir = find_aibuddy_dir()
     
-    if not aibuddy_dir.exists():
+    if not aibuddy_dir:
         console.print("[red]No AI agent found. Run 'ath init' first.[/red]")
         return
+    
+    # Show where we found it if not in current directory
+    if aibuddy_dir.parent != Path.cwd():
+        console.print(f"[dim]Using project at: {aibuddy_dir.parent}[/dim]")
     
     storage = LocalStorage(aibuddy_dir)
     chunks = storage.get_chunks_by_file(file_path)
