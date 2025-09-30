@@ -13,7 +13,6 @@ console = Console()
 
 class AthAI:
     """AI assistant for code understanding - real AI providers only"""
-    
     def __init__(self, storage, ai_provider):
         self.storage = storage
         self.ai_provider = ai_provider
@@ -202,7 +201,7 @@ class AthAI:
             response = requests.post(
                 "http://localhost:11434/api/generate",
                 json={
-                    "model": "codellama",  # Default model
+                    "model": "gemma3:1b", #CHANGE THE MODEL HERE
                     "prompt": full_prompt,
                     "stream": False
                 },
