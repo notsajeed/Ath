@@ -34,7 +34,6 @@ class ProjectScanner:
         python_files = []
         
         for root, dirs, files in os.walk(self.project_path):
-            # Remove ignored directories
             dirs[:] = [d for d in dirs if d not in self.ignore_patterns]
             
             for file in files:
@@ -50,11 +49,9 @@ class ProjectScanner:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            
-            # Parse AST
+
             tree = ast.parse(content)
-            
-            # Add module-level chunk
+
             relative_path = str(file_path.relative_to(self.project_path))
             module_chunk = CodeChunk(
                 file_path=relative_path,
@@ -67,7 +64,6 @@ class ProjectScanner:
             )
             chunks.append(module_chunk)
             
-            # Extract functions and classes
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
                     chunk = self._extract_node_chunk(node, content, relative_path)
@@ -82,8 +78,7 @@ class ProjectScanner:
     def _extract_node_chunk(self, node: ast.AST, file_content: str, file_path: str) -> CodeChunk:
         """Extract a function or class as a code chunk"""
         lines = file_content.split('\n')
-        
-        # Get the actual code content
+
         start_line = node.lineno - 1
         end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 10
         code_content = '\n'.join(lines[start_line:end_line])

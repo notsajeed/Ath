@@ -41,7 +41,6 @@ class LocalStorage:
         conn.commit()
         conn.close()
         
-        # Create config file
         config = {
             "version": "0.1.0",
             "initialized_at": str(Path.cwd()),
