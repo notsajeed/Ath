@@ -7,6 +7,7 @@ setup(
     install_requires=[
         "typer>=0.9.0",
         "rich>=13.0.0",
+        "requests",
     ],
     entry_points={
         "console_scripts": [
